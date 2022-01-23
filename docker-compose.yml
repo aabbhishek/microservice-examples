@@ -1,0 +1,108 @@
+version: '2'
+
+services:
+    mongos:  
+        image: 'bitnami/mongodb-sharded:latest'
+        environment:
+            - MONGODB_SHARDING_MODE=mongos
+            - MONGODB_CFG_PRIMARY_HOST=mongodb-cfg
+            - MONGODB_CFG_REPLICA_SET_NAME=cfgreplicaset
+            - MONGODB_REPLICA_SET_KEY=replicasetkey123
+            - MONGODB_ROOT_PASSWORD=password123
+        ports:
+            - "27017:27017"
+        # volumes:
+        #     - "./mongo/db:/data/db"
+    
+    mongodb-shard0-primary:
+        image: 'bitnami/mongodb-sharded:latest'
+        environment:
+            - MONGODB_SHARDING_MODE=shardsvr
+            - MONGODB_MONGOS_HOST=mongos
+            - MONGODB_ROOT_PASSWORD=password123
+            - MONGODB_REPLICA_SET_MODE=primary
+            - MONGODB_REPLICA_SET_KEY=replicasetkey123
+            - MONGODB_REPLICA_SET_NAME=shard0
+        volumes:
+            - 'shard0_data:/bitnami'
+
+    mongodb-configsvr-primary:
+        image: 'bitnami/mongodb-sharded:latest'
+        environment:
+        - MONGODB_SHARDING_MODE=configsvr
+        - MONGODB_ROOT_PASSWORD=password123
+        - MONGODB_REPLICA_SET_MODE=primary
+        - MONGODB_REPLICA_SET_KEY=replicasetkey123
+        - MONGODB_REPLICA_SET_NAME=config-replicaset
+        volumes:
+        - 'cfg_data:/bitnami'
+
+
+
+
+
+    # mongo_user:
+    #     container_name: ms_mongo_user
+    #     image: mongo:latest
+    #     ports:
+    #         - "27018:27017"
+    #     volumes:
+    #         - "./mongo_user/db:/data/db"
+
+    nginx:
+        build: ./nginx
+        container_name: ms_nginx
+        restart: always
+        depends_on:
+            - store
+            - users
+        links:
+            - store
+            - users
+        ports:
+            - "80:80"
+
+    store:
+        build: ./store
+        container_name: ms_store
+        depends_on:
+            - "mongos"
+        #environment:
+        #    - loglevel=none
+        #links:
+        #    - "mongo:mongo"
+        volumes:
+            - "./store:/src/app"
+        working_dir: "/src/app"
+        ports:
+            - "3001:3000"
+        # command: npm run start
+        command: npm run start
+
+    users:
+        build: ./users
+        container_name: ms_users
+        depends_on:
+            - "mongos"
+        #links:
+        #    - neo4j
+        volumes:
+            - "./users:/src/app"
+        working_dir: "/src/app"
+        ports:
+            - "3002:3000"
+        command: npm start
+    
+    # kafka:
+    #     container_name: kafka
+    #     image: kafka:latest
+    
+    mysql: 
+        container_name: store_db
+        image: mariadb:latest
+
+volumes:
+    shard0_data:
+        driver: local
+    cfg_data:
+        driver: local
